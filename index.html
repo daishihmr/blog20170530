@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1,maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta charset="UTF-8">
+</head>
+
+<body>
+  <script src="https://rawgit.com/phinajs/phina.js/develop/build/phina.min.js"></script>
+  <script src="https://rawgit.com/mrdoob/three.js/r84/build/three.min.js"></script>
+  <script src="https://rawgit.com/mrdoob/three.js/r84/examples/js/BlendCharacter.js"></script>
+  <script>
+  phina.globalize();
+  </script>
+  <script src="Object3D.js"></script>
+  <script src="Mesh.js"></script>
+  <script src="SkinnedMesh.js"></script>
+  <script src="MotionController.js"></script>
+  <script src="Extensions.js"></script>
+  <script>
+  let SCREEN_WIDTH = 480;
+  let SCREEN_HEIGHT = 320;
+  let SHADOW = false;
+
+  phina.main(function() {
+    // 独自にいろいろ拡張してる
+    Extensions.setup();
+
+    let app = GameApp({
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      fps: 60,
+      startLabel: "main",
+      assets: {
+        "skinned": {
+          "enemy3": "enemy3.json",
+        },
+      },
+    });
+    app.run();
+  });
+
+  phina.define("MainScene", {
+    superClass: "DisplayScene",
+    init: function(options) {
+      this.superInit(options);
+      this.fromJSON({
+        children: {
+          // phina.display.ThreeLayerを追加
+          threeLayer: {
+            className: "ThreeLayer",
+            arguments: {
+              width: SCREEN_WIDTH,
+              height: SCREEN_HEIGHT,
+            },
+            originX: 0,
+            originY: 0,
+          },
+
+          text: {
+            className: "Label",
+            arguments: {
+              text: "画面をタップ！",
+              fill: "black",
+            },
+            x: SCREEN_WIDTH * 0.5,
+            y: SCREEN_HEIGHT * 0.9,
+          }
+        },
+      });
+      this.$t = this.threeLayer.scene;
+
+      // ライト
+      let light = new THREE.AmbientLight(0xffffff, 1.0);
+      this.$t.add(light);
+
+      // タップフラグ
+      // タップしたらON。離したらOFF。
+      let tapFlag = false;
+      this.on("pointstart", e => tapFlag = true);
+      this.on("pointend", e => tapFlag = false);
+
+      // 敵キャラをロードしてシーンに配置
+      let enemy = SkinnedMesh("enemy3").addChildTo(this);
+
+      // アイドルモーション
+      let motionIdle = enemy.getMotion("idle");
+      // アイドルモーションはループON
+      motionIdle.setLoop(true);
+
+      // 攻撃モーション
+      let motionAttack = enemy.getMotion("attack0");
+
+      // アイドルモーションにトランジションを追加。
+      // タップフラグが立ったら攻撃モーションへ。
+      motionIdle.addTransition(() => tapFlag, motionAttack, 10);
+
+      // 攻撃モーションにトランジションを追加。
+      // モーションが完了したらアイドルモーションへ。
+      motionAttack.addTransition("finished", motionIdle, 10);
+
+      // 敵キャラのモーションをアイドルモーションにスイッチ。
+      enemy.motionController.switchMotion(motionIdle);
+
+      // カメラぐるぐる設定
+      let camera = this.threeLayer.camera;
+      camera.position.set(2, 2, 4);
+      camera.lookAt(new THREE.Vector3(0, 2, 0));
+      // this.on("enterframe", e => {
+      //   camera.position.set(Math.sin(e.app.frame * 0.01) * 4, 2, Math.cos(e.app.frame * 0.01) * 4);
+      //   camera.lookAt(cameraTarget);
+      // });
+    },
+  });
+  </script>
+</body>
+
+</html>
